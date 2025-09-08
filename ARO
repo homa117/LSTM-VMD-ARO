@@ -1,0 +1,335 @@
+function [BestF,BestX,Bestnet,YTest,YPred]=ARO()
+
+  [~,~,data] = xlsread('F:\maghaleh\4. new work f30\ARO-LSTM-VMD 2\AMZN.xlsx');
+%function[YPred]=motors(data_nat_tr,data_mat_ts,X)
+ data  = cell2mat(data);
+ % data=DataAMZN;
+
+a=size(data,2);
+% data2=data(1:400,1:a);
+% datareal=data(401:end,1:a);
+% [data_rel]=zscore(cell2mat(datareal));
+% mu1=mean(data_rel);
+% sigma1=std(data_rel);
+% data_mat  = cell2mat(data);
+% data_mat2  = cell2mat(data);
+%[data_mat,mu, sigma] = zscore(data);
+data_mat=normalize(data);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Define the sequence  (e.g., 30 days...7 days)
+% sequenceLength = 30;
+
+% Create sequences of features and corresponding target values
+% X = [];
+% Y = [];
+% for i = 1:(size(data_mat, 1) - sequenceLength)
+%     X{i} = data_mat(i:i+sequenceLength-1, :)';
+%     Y{i} = data_mat(i+sequenceLength)';
+% end   
+  
+
+% MaxIteration=1000;
+% PopSize=50;
+% FunIndex=1;
+nPop=5;
+MaxIt=10;
+
+Low1=10;
+Up1=50;
+Low2=100;
+Up2=500;
+Low3=0.001;
+Up3=0.01;
+Low4=0.1;
+Up4=0.4;
+Low5=2;
+Up5=5;
+Low6=1000;
+Up6=2000;
+Dim=6;
+
+%CostFuncName = 'Cost_LSTM_EA';
+
+%[Low,Up,Dim]=FunRange(F_index);
+PopPos=zeros(nPop,Dim);
+PopFit=zeros(nPop,1);
+
+for i=1:nPop
+    %PopPos(i,:)=rand(1,Dim).*(Up-Low)+Low;
+       PopPos(i,1)= randi([Low1,Up1]);
+       PopPos(i,2)= randi([Low2,Up2]);
+       PopPos(i,3)=rand(1,1).*(Up3-Low3)+Low3;
+       PopPos(i,4)=rand(1,1).*(Up4-Low4)+Low4;
+       PopPos(i,5)= randi([Low5,Up5]);
+       PopPos(i,6)= randi([Low6,Up6]);
+    %    [LstmNet_1,Data_predict]=motores_1(data_mat_tr,data_mat_ts,PopPos(i,:),XTrain_tr,YTrain_tr,XTest,YTest);
+    % %PopFit(i)=BenFunctions(PopPos(i,:),F_index,dim);
+    % Ypprd=cell2mat(Data_predict(1:end, 1:end));
+    % YTTtest=cell2mat(YTest(1:end, 1:end));
+    % PopFit(i)=sqrt(mean((Ypprd-YTTtest').^2));
+end
+
+for i=1:size(PopPos,1)
+[LstmNet_1,errortest,YTest,YPred]=motores_1(PopPos(i,:),data_mat); %motores_1
+  PopFit(i)=errortest;
+  nn(i)=LstmNet_1;
+end
+
+BestF=inf;
+BestX=[];
+
+for i=1:nPop
+    if PopFit(i)<=BestF
+        BestF=PopFit(i);
+        BestX=PopPos(i,:);
+        Bestnet=nn(i);
+    end
+end
+
+%HisBestF=zeros(MaxIt,1);
+
+for It=1:MaxIt
+    Direct1=zeros(nPop,Dim);
+    Direct2=zeros(nPop,Dim);
+    theta=2*(1-It/MaxIt);
+    for i=1:nPop
+        L=(exp(1)-exp(((It-1)/MaxIt)^2))*(sin(2*pi*rand)); %Eq.(3)
+        rd=ceil(rand*(Dim));
+        Direct1(i,randperm(Dim,rd))=1;
+        c=Direct1(i,:); %Eq.(4)
+        R=L.*c; %Eq.(2)
+        
+        A=2*log(1/rand)*theta;%Eq.(15)
+
+        if A>1
+
+            K=[1:i-1 i+1:nPop];
+            RandInd=K(randi([1 nPop-1]));
+            PopPos(i,:)=PopPos(RandInd,:)+R.*( PopPos(i,:)-PopPos(RandInd,:))...
+                +round(0.5*(0.05+rand))*randn; %Eq.(1)
+        else
+
+            Direct2(i,ceil(rand*Dim))=1;
+            gr=Direct2(i,:); %Eq.(12)
+            H=((MaxIt-It+1)/MaxIt)*randn; %Eq.(8)
+            b=PopPos(i,:)+H*gr.*PopPos(i,:); %Eq.(13)
+            PopPos(i,:)=PopPos(i,:)+ R.*(rand*b-PopPos(i,:)); %Eq.(11)
+        end
+
+        % newPopPos(i,1)=SpaceBound(newPopPos(i,1),Up1,Low1);
+        % newPopPos(i,2)=SpaceBound(newPopPos(i,2),Up2,Low2);
+        % newPopPos(i,3)=SpaceBound(newPopPos(i,3),Up3,Low3);
+        % newPopPos(i,4)=SpaceBound(newPopPos(i,4),Up4,Low4);
+
+        for k=1:size(PopPos,1)
+%         for j=1:size(X,2)-2
+        Flag4ub1=PopPos(k,1)>Up1;
+        Flag4lb1=PopPos(k,1)<Low1;
+        PopPos(k,1)=(PopPos(k,1).*(~(Flag4ub1+Flag4lb1)))+Up1.*Flag4ub1+Low1.*Flag4lb1;
+        
+        Flag4ub2=PopPos(k,2)>Up2;
+        Flag4lb2=PopPos(k,2)<Low2;
+        PopPos(k,2)=(PopPos(k,2).*(~(Flag4ub2+Flag4lb2)))+Up2.*Flag4ub2+Low2.*Flag4lb2;
+        
+        Flag4ub3=PopPos(k,3)>Up3;
+        Flag4lb3=PopPos(k,3)<Low3;
+        PopPos(k,3)=(PopPos(k,3).*(~(Flag4ub3+Flag4lb3)))+Up3.*Flag4ub3+Low3.*Flag4lb3;
+        
+        Flag4ub4=PopPos(k,4)>Up4;
+        Flag4lb4=PopPos(k,4)<Low4;
+        PopPos(k,4)=(PopPos(k,4).*(~(Flag4ub4+Flag4lb4)))+Up4.*Flag4ub4+Low4.*Flag4lb4;
+        
+        Flag4ub5=PopPos(k,5)>Up5;
+        Flag4lb5=PopPos(k,5)<Low5;
+        PopPos(k,5)=(PopPos(k,5).*(~(Flag4ub5+Flag4lb5)))+Up5.*Flag4ub5+Low5.*Flag4lb5;
+
+        Flag4ub6=PopPos(k,6)>Up6;
+        Flag4lb6=PopPos(k,6)<Low6;
+        PopPos(k,6)=(PopPos(k,6).*(~(Flag4ub6+Flag4lb6)))+Up6.*Flag4ub6+Low6.*Flag4lb6;
+        
+        % Flag4ub5=PopPos(k,5)>UB_5;
+        % Flag4lb5=PopPos(k,5)<LB_5;
+        % PopPos(k,5)=(PopPos(k,5).*(~(Flag4ub5+Flag4lb5)))+UB_5.*Flag4ub5+LB_5.*Flag4lb5;
+        % 
+        % Flag4ub6=PopPos(k,6)>UB_6;
+        % Flag4lb6=PopPos(k,6)<LB_6;
+        %PopPos(k,6)=(PopPos(k,6).*(~(Flag4ub6+Flag4lb6)))+UB_6.*Flag4ub6+LB_6.*Flag4lb6;
+        PopPos(k,1)=ceil(PopPos(k,1));       
+        PopPos(k,2)=ceil(PopPos(k,2));
+        PopPos(k,5)=ceil(PopPos(k,5));       
+        PopPos(k,6)=ceil(PopPos(k,6));
+       % PopPos(k,3)=ceil(X(k,3));
+        %PopPos(k,4)=ceil(X(k,4));
+        % PopPos(k,5)=floor(PopPos(k,5));
+        % PopPos(k,6)=floor(PopPos(k,6));
+
+    end
+
+        
+        % newPopPos=SpaceBound(newPopPos,Up1,Low1);
+        % newPopPos=SpaceBound(newPopPos,Up2,Low2);
+        % newPopPos=SpaceBound(newPopPos,Up3,Low3);
+        % newPopPos=SpaceBound(newPopPos,Up4,Low4);
+        
+        %newPopFit=BenFunctions(newPopPos,F_index,Dim);
+        %newPopFit=feval(CostFuncName,PopPos(i).Position,Xtrain,YTrain,net);
+        %for i=1:nPop
+[LstmNet_1,errortest,YTest,YPred]=motores_1(PopPos(i,:),data_mat);%motores_1
+  PopFit(i)=errortest;
+  nn(i)=LstmNet_1;
+
+    end
+
+    for i=1:nPop
+        if PopFit(i)<BestF
+        BestF=PopFit(i);
+        BestX=PopPos(i,:);
+        Bestnet=nn(i);
+        end
+    end
+
+    %HisBestF(It)=BestF;
+
+end
+
+% plot(BestF)
+% y1 = (cell2mat(YPred(1:end, 1:end)));  %have to transpose as plot plots columns
+% plot(YPred,'*-b')
+% hold on
+% y2 = (cell2mat(YTest(1:end, 1:end))');
+% plot(y2,'.-k')
+%BestX----->numIMF
+%%%%%test
+% % 
+% %     X1(1).imf=vmd(data_mat_ts(:,1),'NumIMFs',X(5),'PenaltyFactor',X(6));
+% %     X1(2).imf=vmd(data_mat_ts(:,2),'NumIMFs',X(5),'PenaltyFactor',X(6));
+% %     X1(3).imf=vmd(data_mat_ts(:,3),'NumIMFs',X(5),'PenaltyFactor',X(6));
+% %     X1(4).imf=vmd(data_mat_ts(:,4),'NumIMFs',X(5),'PenaltyFactor',X(6));
+% %     X1(5).imf=vmd(data_mat_ts(:,5),'NumIMFs',X(5),'PenaltyFactor',X(6));
+% % for i=1:size(X(5))
+% % XTest(i)=[X1(1).imf(:,i) X1(2).imf(:,i) X1(3).imf(:,i) X1(4).imf(:,i) X1(5).imf(:,i)];
+% % end
+
+% for i=1:size(data_mat_ts,2)
+%     X1(i).imf=vmd(data_mat_ts(:,i),'NumIMFs',BestX(5),'PenaltyFactor',BestX(6));
+% end
+% data_mat_ts=X1.imf;
+%end
+YTest=cell2mat(YTest);
+% figure(4)
+% t = -1:.1:2;
+% plot(t,t,'b','linewidth',2)
+% hold on
+% plot(YTest',YPred,'ok')
+% hold off
+end
+function [net,Errortest,YTest,YPred]=motores_1(X,data_mat)
+
+
+    data_mat=normalize(data_mat);
+    X1(1).imf=vmd(data_mat(:,1),'NumIMFs',X(5),'PenaltyFactor',X(6));
+    % X1(2).imf=vmd(data_mat(:,2),'NumIMFs',X(5),'PenaltyFactor',X(6));
+    % X1(3).imf=vmd(data_mat(:,3),'NumIMFs',X(5),'PenaltyFactor',X(6));
+    % X1(4).imf=vmd(data_mat(:,4),'NumIMFs',X(5),'PenaltyFactor',X(6));
+    % X1(5).imf=vmd(data_mat(:,5),'NumIMFs',X(5),'PenaltyFactor',X(6));
+    % data_mat1=[X1(1).imf,X1(2).imf,X1(3).imf,X1(4).imf,X1(5).imf];
+    data_mat1=X1(1).imf;
+
+data_mat_tr=data_mat1(1:ceil(4/5*size(data_mat1,1)),:);
+data_mat_ts=data_mat1(ceil(4/5*size(data_mat1,1))+1:end,:);
+
+YTrain_tr = (data_mat_tr(:,end))';
+XTrain_tr =  (data_mat_tr(:,1:end))';
+
+XTrain_tr = num2cell(XTrain_tr,1);
+YTrain_tr = num2cell(YTrain_tr,1);
+
+YTest = (data_mat_ts(:,end))';
+XTest =  (data_mat_ts(:,1:end))';
+
+XTest = num2cell(XTest,1);
+YTest = num2cell(YTest,1);
+
+%% Define Network Architecture
+% Step2: Create a LSTM network
+numResponses = size(YTrain_tr{1},1);
+% numResponses = size(YTrain_tr,1);
+ featureDimension = size(XTrain_tr{1},1);
+% featureDimension = size(data_mat,2);
+
+numHiddenUnits = X(1);%100
+
+layers = [ ...
+    sequenceInputLayer(featureDimension)
+    lstmLayer(numHiddenUnits,'OutputMode','sequence')
+    fullyConnectedLayer(500)  %%50
+    dropoutLayer(0.1)  %%0.5
+    fullyConnectedLayer(numResponses)
+    regressionLayer];
+%% Train option
+maxepochs = X(2);%1000
+InitialLearnRate = X(3);%0.005
+miniBatchSize = 1;
+
+options = trainingOptions('adam', ...  %%adam
+    'MaxEpochs',maxepochs, ...
+    'GradientThreshold',1, ...
+    'InitialLearnRate',InitialLearnRate, ...
+    'LearnRateSchedule','piecewise', ...
+    'LearnRateDropPeriod',50, ...
+    'LearnRateDropFactor',X(4), ...
+    'ExecutionEnvironment','cpu',...
+    'Verbose',0, ...
+    'Plots','none');
+%% Train the Network
+ net = trainNetwork(XTrain_tr,YTrain_tr,layers,options);
+ % YTrain_tr=cell2mat(YTrain_tr);
+ % for ii=1:
+ % net = trainnet(data_mat,YTrain_tr,layers,"mse",options);
+ % net = trainNetwork(data_mat,YTrain_tr',layers,options);
+
+
+
+net = resetState(net);
+YPred = predict(net,XTest);
+
+Errortest=rmse(cell2mat(YPred),cell2mat(YTest'));
+RMSE=rmse(cell2mat(YPred),cell2mat(YTest'))
+MAE=mae(cell2mat(YPred)-cell2mat(YTest'))
+pre_MAPE = abs((cell2mat(YTest')-cell2mat(YPred))./cell2mat(YPred));
+MAPE = mean(pre_MAPE(isfinite(pre_MAPE)))
+C=0.5*( mse(cell2mat(YPred) - cell2mat(YTest')))+2*( mae(cell2mat(YPred) - cell2mat(YTest')))
+NRMSE=norm((cell2mat(YPred) - cell2mat(YTest'))) / norm((cell2mat(YPred)-mean(cell2mat(YPred))))
+%Errortest=mae(cell2mat(YPred)-cell2mat(YTest'));
+%pre_MAPE = abs((cell2mat(YTest')-cell2mat(YPred))./cell2mat(YPred));
+%Errortest = mean(pre_MAPE(isfinite(pre_MAPE)));
+%Errortest =0.5*( mse(cell2mat(YPred) - cell2mat(YTest')))+2*( mae(cell2mat(YPred) - cell2mat(YTest')));
+%Errortest = norm((cell2mat(YPred) - cell2mat(YTest'))) / norm((cell2mat(YPred)-mean(cell2mat(YPred))));
+%t=X(2);
+%figure
+% plot(MAE,'*-b')
+% hold on
+% plot(RMSE,'*-g')
+% hold on
+% plot(MAPE,'*-r')
+% hold on
+% plot(C,'*-y')
+% hold on
+% plot(NRMSE,'*-k')
+
+% figure
+ YPred = (cell2mat(YPred(1:end, 1:end)));  %have to transpose as plot plots columns
+%  plot(y1,'*-b')
+% hold on
+%  y2 = (cell2mat(YTest(1:end, 1:end))');
+%  plot(y2,'.-k')
+end
+% MAE=mae((YPred)-(YTest'))
+% pre_MAPE = abs(((YTest')-(YPred))./(YPred));
+% MAPE = mean(pre_MAPE(isfinite(pre_MAPE)))
+% C=0.5*( mse((YPred) - (YTest')))+2*( mae((YPred) - (YTest')))
+% NRMSE=norm(((YPred) - (YTest'))) / norm(((YPred)-mean((YPred))))
+% 
+% plot(YPred,'*-b')
+% hold on
+% plot(YTest','.-k')
